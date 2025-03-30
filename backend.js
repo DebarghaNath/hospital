@@ -8,6 +8,8 @@ const nodemailer = require('nodemailer');
 app.use(express.json());
 const appointmentsRoutes = require('./api/appointments'); 
 app.use('/api/appointments', appointmentsRoutes);
+const authorizationRoutes = require('./api/authorization')
+app.use('/api/authorization', authorizationRoutes);
 dotenv.config();
 
 const { createClient } = require('@supabase/supabase-js');
