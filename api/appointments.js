@@ -26,6 +26,7 @@ router.post("/book", async (req, res) => {
 });
 
 router.get("/:id", async (req, res) => {
+    console.log("INSIDE get appointments api");
     const { id } = req.params;
     try {
         const { data, error } = await supabase
@@ -39,7 +40,9 @@ router.get("/:id", async (req, res) => {
             return res.status(500).json({ error: error.message });
         }
         
-        if (!data) {
+        if (!data) 
+            {
+                console.log("data NOT found");
             return res.status(404).json({ error: "Appointment not found" });
         }
         

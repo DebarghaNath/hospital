@@ -66,12 +66,12 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-const sendEmail = (email) => {
+const sendEmail = (email,message) => {
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: email,
         subject: 'DBMS Hospital',
-        text: "Welcome to Hospital",
+        text: message,
     };
     console.log(mailOptions);
     return transporter.sendMail(mailOptions);
@@ -80,9 +80,9 @@ app.post("/mailer", async(req,res)=>{
     try
     {
         console.log(req.body);
-        const {email} = req.body; 
+        const {email,message} = req.body; 
         console.log("calling send email");
-        await sendEmail(email);
+        await sendEmail(email,message);
         console.log("email sent successfully"); 
         res.status(200).json(
             {
@@ -125,83 +125,6 @@ app.get('/test', async (req, res) =>
     }
 });
 
-//----------------------------------------------appointmentapi--------------------------
-/*
-app.post("/api/appointments/book",async (req,res)=>
-    {
-        const { patientID, doctorID, date, time } = req.body
-        try
-        {
-            const {data,error} = await supabase
-            .from('appointments')
-            .insert([{ patientid: patientID, doctorid: doctorID, date:date, time:time }])
-            .select('appointmentid')
-            if(error){
-                console.error('Supabase insert error:',error);
-                return res.status(505).json({err:err.message})
-            }
-            //console.log(data[0].appointmentid)
-            return res.status(200).json({"success":true,appointmentid:data[0].appointmentid})
-        }
-        catch(err)
-        {
-            return res.status(505).json({err:err.message})
-        }
-    })
-
-app.get("/api/appointments/:id",async (req,res)=>{
-    const {id} = req.params;
-    try{
-        const {data,error} = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('appointmentid',id)
-        .single()
-
-        if (error) {
-            console.error('Supabase fetch error:', error);
-            return res.status(500).json({ error: error.message });
-        }
-      
-        if (!data) {
-            return res.status(404).json({ error: "Appointment not found" });
-        }
-      
-        return res.status(200).json({ appointmentDetails: data });
-    }
-    catch(err){
-        return res.status(500).json({err:err.message})
-    }
-})
-app.delete("/api/appointments/:id/cancel",async (req,res)=>
-    {
-        const {id} = req.params;
-        try{
-            const {data,error} = await supabase
-            .from('appointments')
-            .select('*')
-            .eq('appointmentid',id)
-            .single()
-            if (error|| data == null) 
-            {
-                return res.status(404).json({ error: "Appointment not found" });
-            }
-            const {inserterror} = await supabase
-            .from('appointments')
-            .delete()
-            .eq('appointmentid',id)
-
-            if (inserterror) {
-                console.error("Supabase delete error:", inserterror);
-                return res.status(500).json({ error: inserterror.message });
-            }
-            return res.status(200).json({"success":true})
-        }catch(err){
-            return res.status(500).json({err:err.message})
-        }
-
-    })
-*/
 app.listen(8080, () => 
 {
     console.log("listening on port 8080");
