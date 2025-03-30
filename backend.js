@@ -5,11 +5,11 @@ const cloudinary = require('cloudinary').v2
 const cors = require('cors')
 const app = express();
 const nodemailer = require('nodemailer');
-
 app.use(express.json());
-
+const appointmentsRoutes = require('./api/appointments'); 
+app.use('/api/appointments', appointmentsRoutes);
 dotenv.config();
-console.log(process.env.CLOUDINARY_API_KEY);
+
 const { createClient } = require('@supabase/supabase-js');
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
@@ -96,27 +96,111 @@ app.post("/mailer", async(req,res)=>{
     }
 })
 
-app.get('/', (req, res) => {  
+app.get('/', (req, res) => 
+{  
     return res.status(200).json({
         "status": "success"
     });
 });
 
-app.get('/test', async (req, res) => {
-    try {
+app.get('/test', async (req, res) => 
+{
+    try 
+    {
         const { data, error } = await supabase
             .from('test_table')
             .select('*');
         
-        if (error) {
+        if (error) 
+        {
             return res.status(500).json({ error: error.message });
         }
         res.json({ data });
-    } catch (err) {
+    } 
+    catch (err) 
+    {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.listen(8080, () => {
+//----------------------------------------------appointmentapi--------------------------
+/*
+app.post("/api/appointments/book",async (req,res)=>
+    {
+        const { patientID, doctorID, date, time } = req.body
+        try
+        {
+            const {data,error} = await supabase
+            .from('appointments')
+            .insert([{ patientid: patientID, doctorid: doctorID, date:date, time:time }])
+            .select('appointmentid')
+            if(error){
+                console.error('Supabase insert error:',error);
+                return res.status(505).json({err:err.message})
+            }
+            //console.log(data[0].appointmentid)
+            return res.status(200).json({"success":true,appointmentid:data[0].appointmentid})
+        }
+        catch(err)
+        {
+            return res.status(505).json({err:err.message})
+        }
+    })
+
+app.get("/api/appointments/:id",async (req,res)=>{
+    const {id} = req.params;
+    try{
+        const {data,error} = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('appointmentid',id)
+        .single()
+
+        if (error) {
+            console.error('Supabase fetch error:', error);
+            return res.status(500).json({ error: error.message });
+        }
+      
+        if (!data) {
+            return res.status(404).json({ error: "Appointment not found" });
+        }
+      
+        return res.status(200).json({ appointmentDetails: data });
+    }
+    catch(err){
+        return res.status(500).json({err:err.message})
+    }
+})
+app.delete("/api/appointments/:id/cancel",async (req,res)=>
+    {
+        const {id} = req.params;
+        try{
+            const {data,error} = await supabase
+            .from('appointments')
+            .select('*')
+            .eq('appointmentid',id)
+            .single()
+            if (error|| data == null) 
+            {
+                return res.status(404).json({ error: "Appointment not found" });
+            }
+            const {inserterror} = await supabase
+            .from('appointments')
+            .delete()
+            .eq('appointmentid',id)
+
+            if (inserterror) {
+                console.error("Supabase delete error:", inserterror);
+                return res.status(500).json({ error: inserterror.message });
+            }
+            return res.status(200).json({"success":true})
+        }catch(err){
+            return res.status(500).json({err:err.message})
+        }
+
+    })
+*/
+app.listen(8080, () => 
+{
     console.log("listening on port 8080");
 });
