@@ -4,6 +4,7 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2
 const cors = require('cors')
 const app = express();
+const cron = require('node-cron')
 const nodemailer = require('nodemailer');
 app.use(express.json());
 const appointmentsRoutes = require('./api/appointments'); 
@@ -74,7 +75,12 @@ const sendEmail = (email,message) => {
         text: message,
     };
     console.log(mailOptions);
-    return transporter.sendMail(mailOptions);
+    try {
+        transporter.sendMail(mailOptions);
+        console.log(`Email sent to: ${email}`);
+    } catch (error) {
+        console.log(`Error sending email to ${email}: ${error.message}`);
+    }
 }
 app.post("/mailer", async(req,res)=>{
     try
@@ -124,8 +130,86 @@ app.get('/test', async (req, res) =>
         res.status(500).json({ error: err.message });
     }
 });
+async function DoctorEmail() {
+    console.log("Fetching doctor email info...");
+    const { data, error } = await supabase
+        .from('doctors')
+        .select('*');
+    
+    if (error) {
+        console.error("Error fetching doctor emails:", error.message);
+        return null;
+    }
 
+    return data;
+}
+async function SendAppRemainder()
+{
+    console.log("checking for email.....");
+    const now = new Date();
+    now.setHours(now.getHours()+5)
+    now.setMinutes(now.getMinutes()+30)
+    const sqlFormattedTime = now.toISOString().slice(0, 19).replace('T', ' ');
+    const [date,time] = sqlFormattedTime.split(' ')
+    console.log(date)
+    const doctorEmail = await DoctorEmail(); 
+    const emailinfo = new Map();
+    for(var i = 0;i<doctorEmail.length;i++){
+        emailinfo.set(doctorEmail[i].doctorid,{
+            name:doctorEmail[i].d_name,
+            email:doctorEmail[i].email
+        })
+    }
+    console.log(emailinfo)
+    const {data,error} = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('date',date)
+    .lt('time',time)
+
+    if(error)
+        {
+            return res.status(500).json({err:error.message})
+        }
+    if(data!=null)
+        {   
+            const message = []
+            for(var i=0;i<data.length;i++)
+            {
+                const doctorInfo = emailinfo.get(data[i].doctorid);  
+                if (doctorInfo) { 
+                    let txt = `Dr.${doctorInfo.name} you have appointment no: ${data[i].appointmentid} with patient ID:${data[i].patientid} today at ${data[i].time}`;
+                    let mss = 
+                    {
+                        doctorID: data[i].doctorid, 
+                        message: txt
+                    };
+                    message.push(mss);
+                } else {
+                    console.log(`No doctor found for doctorid: ${data[i].doctorid}`);
+                }
+            }
+            console.log(message)
+            for (let i = 0; i < message.length; i++) {
+                const doctorID = message[i].doctorID;
+                const doctor = emailinfo.get(doctorID);  
+                if (doctor) 
+                    {  
+                  console.log(`Sending email to: ${doctor.email}`);
+                  console.log(`Message: ${message[i].message}`);
+                  await sendEmail(doctor.email, message[i].message); 
+                } else {
+                  console.log(`Doctor with ID ${doctorID} not found in emailinfo`);
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+            console.log("-----------------------DONE---------------------------")
+        }
+
+}
+cron.schedule('* * * * *',SendAppRemainder)
 app.listen(8080, () => 
 {
+    
     console.log("listening on port 8080");
 });
