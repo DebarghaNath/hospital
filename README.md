@@ -39,5 +39,5 @@ Follow these steps to set up the project locally:
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/dbms-hospital-backend.git
-   cd dbms-hospital-backend
+   git clone https://github.com/DebarghaNath/hospital
+
