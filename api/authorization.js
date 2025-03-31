@@ -69,5 +69,27 @@ router.post("/signup",async (req,res)=>{
     }
 
 });
+router.put("/submit-password", async (req, res) => {
+    const { email, password } = req.body;
+
+    try {
+        const {data,error } = await supabase
+            .from('users')
+            .update({ password: password }) 
+            .eq('email', email)
+            .select();
+        console.log(data)
+        if (error) {
+            return res.status(500).json({ error: error.message });
+        }
+        if(data.length==0)
+            {
+                return res.status(500).json({ error:"user not found" });   
+            }
+        return res.status(200).json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
 
 module.exports = router
