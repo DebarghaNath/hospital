@@ -10,6 +10,7 @@ const router = express.Router();
 async function fetchAppointments(req,res,next)
 {
     const date = req.query.date||req.body.date
+    const doctorid = req.query.doctorid||req.body.doctorid
     if(!date){
         return res.status(400).json({err:"Date Parameter is required"});
     }
@@ -17,6 +18,7 @@ async function fetchAppointments(req,res,next)
         const {data,error} = await supabase
         .from('appointments')
         .select('time')
+        .eq('doctorid',doctorid)
         .eq('date',date)
         if(error){
             return res.status(500).json({err:error.message})
@@ -142,5 +144,4 @@ router.delete("/:id/cancel", async (req, res) => {
         return res.status(500).json({ err: err.message });
     }
 });
-
 module.exports = router;

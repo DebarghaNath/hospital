@@ -5,12 +5,14 @@ const cloudinary = require('cloudinary').v2
 const cors = require('cors')
 const app = express();
 const cron = require('node-cron')
-const nodemailer = require('nodemailer');
 app.use(express.json());
 const appointmentsRoutes = require('./api/appointments'); 
 app.use('/api/appointments', appointmentsRoutes);
 const authorizationRoutes = require('./api/authorization')
 app.use('/api/authorization', authorizationRoutes);
+
+const sendEmail = require('./api/mailer');
+
 dotenv.config();
 
 const { createClient } = require('@supabase/supabase-js');
@@ -58,30 +60,7 @@ app.post("/upload", upload.single("image"), async (req, res) => {
         res.status(500).json({ error: "Server error" });
     }
 });
-//---------------------------------Mail-----------------------------------------
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS,
-    },
-});
 
-const sendEmail = (email,message) => {
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: 'DBMS Hospital',
-        text: message,
-    };
-    console.log(mailOptions);
-    try {
-        transporter.sendMail(mailOptions);
-        console.log(`Email sent to: ${email}`);
-    } catch (error) {
-        console.log(`Error sending email to ${email}: ${error.message}`);
-    }
-}
 app.post("/mailer", async(req,res)=>{
     try
     {
@@ -165,7 +144,7 @@ async function SendAppRemainder()
     .from('appointments')
     .select('*')
     .eq('date',date)
-    .lt('time',time)
+    .eq('time',time)
 
     if(error)
         {
@@ -205,9 +184,8 @@ async function SendAppRemainder()
               }
             console.log("-----------------------DONE---------------------------")
         }
-
 }
-cron.schedule('* * * * *',SendAppRemainder)
+cron.schedule('0 0 * * 0', SendAppRemainder);
 app.listen(8080, () => 
 {
     
