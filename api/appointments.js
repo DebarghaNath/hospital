@@ -6,11 +6,86 @@ const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 const express = require('express')
 const router = express.Router();
+const sendEmail = require('./mailer');
+const { promises } = require('nodemailer/lib/xoauth2');
+
+async function Mail(doctorID, patientID, date, time) {
+   // console.log("patientID:", patientID);
+    //console.log("doctorID:", doctorID);
+    
+    let patientEmail, doctorEmail;
+    
+    try {
+        const { data: pdata, error: perror } = await supabase
+            .from('patients')
+            .select('email')
+            .eq('patientid', patientID);
+        
+        if (perror) {
+            console.error("Patient fetch error:", perror);
+            throw new Error(perror.message);
+        }
+        
+        if (!pdata || pdata.length === 0) {
+            throw new Error("Patient email not found");
+        }
+        
+        patientEmail = pdata[0].email;
+    } catch (err) {
+        console.error("Error fetching patient email:", err);
+        throw err;
+    }
+    
+    try {
+        const { data: ddata, error: derror } = await supabase
+            .from('doctors')
+            .select('email')
+            .eq('doctorid', doctorID);
+        
+        if (derror) {
+            console.error("Doctor fetch error:", derror);
+            throw new Error(derror.message);
+        }
+        
+        if (!ddata || ddata.length === 0) {
+            throw new Error("Doctor email not found");
+        }
+        
+        doctorEmail = ddata[0].email;
+    } catch (err) {
+        console.error("Error fetching doctor email:", err);
+        throw err;
+    }
+    
+    const pmessage = `Hello, Your appointment is scheduled on ${date} at ${time}`;
+    const dmessage = `Dr, your appointment is scheduled on ${date} at ${time}`;
+    
+    //console.log("Patient Message:", pmessage);
+    //console.log("Doctor Message:", dmessage);
+    //console.log("Patient Email:", patientEmail);
+    //console.log("Doctor Email:", doctorEmail);
+    try{
+        await sendEmail(patientEmail, pmessage);
+    }
+    catch(err){
+        console.log(err.message)
+    }
+    try{   
+        sendEmail(doctorEmail, dmessage);
+    }catch(err){
+        console.log(err.message)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000)); 
+
+    console.log("Email sent");
+}
+
 
 async function fetchAppointments(req,res,next)
 {
     const date = req.query.date||req.body.date
-    const doctorid = req.query.doctorid||req.body.doctorid
+    const doctorid = req.query.doctorID||req.body.doctorID
+    console.log(date,doctorid)
     if(!date){
         return res.status(400).json({err:"Date Parameter is required"});
     }
@@ -26,13 +101,16 @@ async function fetchAppointments(req,res,next)
         req.appointments = data;
         next();
     }catch(err){
+        console.log("HERE")
         return res.status(500).json({err:err.message})
     }
 }
+
 router.post("/book",fetchAppointments,async (req, res) => 
-    {
+{
     const { patientID, doctorID, date} = req.body;
     console.log("GET /book appointments:", req.appointments);
+
     //console.log(req.appointments)
     const timeslot = []
     for(var i=0;i<req.appointments.length;i++)
@@ -80,17 +158,42 @@ router.post("/book",fetchAppointments,async (req, res) =>
         }
         
         console.log("Inserted appointment:", data);
+        await Mail(doctorID,patientID,date,availtimeslot)
         return res.status(200).json({ 
             success: true, 
             appointmentid: data[0].appointmentid, 
         });
     } catch (err) {
+        console.log("HERE")
         return res.status(500).json({ err: err.message });
     }
 });
 
+router.get("/getappointments", async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('appointments')
+            .select('*'); 
+    
+        if (error) {
+            console.error('Supabase fetch error:', error);
+            return res.status(500).json({ error: error.message });
+        }
+    
+        if (!data || data.length === 0) {
+            console.log("No appointments found");
+            return res.status(404).json({ error: "Appointments not found" });
+        }
+    
+        return res.status(200).json({ appointmentDetails: data });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+
 router.get("/:id", async (req, res) => {
-    console.log("INSIDE get appointments api");
+    //console.log("INSIDE get appointments api");
     const { id } = req.params;
     try {
         const { data, error } = await supabase
@@ -144,4 +247,5 @@ router.delete("/:id/cancel", async (req, res) => {
         return res.status(500).json({ err: err.message });
     }
 });
+
 module.exports = router;
