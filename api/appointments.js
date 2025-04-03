@@ -14,11 +14,11 @@ async function Mail(doctorID, patientID, date, time) {
     //console.log("doctorID:", doctorID);
     
     let patientEmail, doctorEmail;
-    
+    let patientName,doctorName;
     try {
         const { data: pdata, error: perror } = await supabase
             .from('patients')
-            .select('email')
+            .select('*')
             .eq('patientid', patientID);
         
         if (perror) {
@@ -29,8 +29,10 @@ async function Mail(doctorID, patientID, date, time) {
         if (!pdata || pdata.length === 0) {
             throw new Error("Patient email not found");
         }
-        
+        console.log(pdata[0])
+
         patientEmail = pdata[0].email;
+        patientName = pdata[0].patientname
     } catch (err) {
         console.error("Error fetching patient email:", err);
         throw err;
@@ -39,7 +41,7 @@ async function Mail(doctorID, patientID, date, time) {
     try {
         const { data: ddata, error: derror } = await supabase
             .from('doctors')
-            .select('email')
+            .select('*')
             .eq('doctorid', doctorID);
         
         if (derror) {
@@ -50,15 +52,16 @@ async function Mail(doctorID, patientID, date, time) {
         if (!ddata || ddata.length === 0) {
             throw new Error("Doctor email not found");
         }
-        
+        console.log(ddata[0])
         doctorEmail = ddata[0].email;
+        doctorName = ddata[0].doctorname
     } catch (err) {
         console.error("Error fetching doctor email:", err);
         throw err;
     }
-    
-    const pmessage = `Hello, Your appointment is scheduled on ${date} at ${time}`;
-    const dmessage = `Dr, your appointment is scheduled on ${date} at ${time}`;
+    //console.log("---------",patientName,doctorName)
+    const pmessage = `Hello,${patientName} Your appointment is scheduled on ${date} at ${time}`;
+    const dmessage = `${doctorName} your appointment is scheduled on ${date} at ${time}`;
     
     //console.log("Patient Message:", pmessage);
     //console.log("Doctor Message:", dmessage);
@@ -85,7 +88,7 @@ async function fetchAppointments(req,res,next)
 {
     const date = req.query.date||req.body.date
     const doctorid = req.query.doctorID||req.body.doctorID
-    console.log(date,doctorid)
+    //console.log(date,doctorid)
     if(!date){
         return res.status(400).json({err:"Date Parameter is required"});
     }
@@ -109,7 +112,7 @@ async function fetchAppointments(req,res,next)
 router.post("/book",fetchAppointments,async (req, res) => 
 {
     const { patientID, doctorID, date} = req.body;
-    console.log("GET /book appointments:", req.appointments);
+    //console.log("GET /book appointments:", req.appointments);
 
     //console.log(req.appointments)
     const timeslot = []
@@ -119,7 +122,7 @@ router.post("/book",fetchAppointments,async (req, res) =>
             timeslot.push(hours * 60 + minutes)
         }
     timeslot.sort((a,b)=>a-b);
-    console.log(timeslot)
+    //console.log(timeslot)
     var availtimeslot = null;
     var flag = 0;
     for(var i=0;i<timeslot.length-1;i++)
@@ -136,7 +139,13 @@ router.post("/book",fetchAppointments,async (req, res) =>
                     break;
                 }
             }
-            if(!flag){if (!flag) {
+            if(!flag && timeslot.length==0)
+            {
+                console.log("HERE")
+                availtimeslot = `12:00:00`
+            }
+            else if (!flag) 
+            {
                 let newslot = timeslot[timeslot.length - 1]; 
                 let hours = Math.floor(newslot / 60);         
                 let minutes = newslot % 60;                    
@@ -144,7 +153,7 @@ router.post("/book",fetchAppointments,async (req, res) =>
                 hours += 1;  
                 availtimeslot = `${hours}:${minutes.toString().padStart(2, '0')}`;  
             }
-            }
+
             console.log(`Available Time Slot: ${availtimeslot}`);
     try {
         const { data, error } = await supabase
@@ -157,7 +166,7 @@ router.post("/book",fetchAppointments,async (req, res) =>
             return res.status(500).json({ err: error.message });
         }
         
-        console.log("Inserted appointment:", data);
+        //console.log("Inserted appointment:", data);
         await Mail(doctorID,patientID,date,availtimeslot)
         return res.status(200).json({ 
             success: true, 
