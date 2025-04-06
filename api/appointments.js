@@ -10,8 +10,6 @@ const sendEmail = require('./mailer');
 const { promises } = require('nodemailer/lib/xoauth2');
 
 async function Mail(doctorID, patientID, date, time) {
-   // console.log("patientID:", patientID);
-    //console.log("doctorID:", doctorID);
     let patientEmail, doctorEmail;
     let patientName,doctorName;
     try {
@@ -58,14 +56,8 @@ async function Mail(doctorID, patientID, date, time) {
         console.error("Error fetching doctor email:", err);
         throw err;
     }
-    //console.log("---------",patientName,doctorName)
     const pmessage = `Hello,${patientName} Your appointment is scheduled on ${date} at ${time}`;
     const dmessage = `${doctorName} your appointment is scheduled on ${date} at ${time}`;
-    
-    //console.log("Patient Message:", pmessage);
-    //console.log("Doctor Message:", dmessage);
-    //console.log("Patient Email:", patientEmail);
-    //console.log("Doctor Email:", doctorEmail);
     try{
         await sendEmail(patientEmail, pmessage);
     }
@@ -87,7 +79,6 @@ async function fetchAppointments(req,res,next)
 {
     const date = req.query.date||req.body.date
     const doctorid = req.query.doctorID||req.body.doctorID
-    //console.log(date,doctorid)
     if(!date){
         return res.status(400).json({err:"Date Parameter is required"});
     }
