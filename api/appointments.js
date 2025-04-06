@@ -170,8 +170,7 @@ router.post("/book",fetchAppointments,async (req, res) =>
 });
 
 router.get("/getdoctors",async (req,res)=>{
-    const {departmentid} = req.body;
-    console.log(departmentid)
+    const {departmentname} = req.body;
     try{
         const { data, error } = await supabase
         .from('departments')
@@ -184,7 +183,7 @@ router.get("/getdoctors",async (req,res)=>{
               departmentid
             )
           `)
-          .eq('departmentid',departmentid)
+          .eq('departmentname',departmentname)
         
         if(error){
             return res.status(500).json({err:err.message})
