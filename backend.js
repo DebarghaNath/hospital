@@ -7,20 +7,15 @@ const app = express();
 const cron = require('node-cron')
 app.use(express.json());
 const appointmentsRoutes = require('./api/appointments'); 
-app.use('/api/appointments', appointmentsRoutes);
 const authorizationRoutes = require('./api/authorization')
-app.use('/api/authorization', authorizationRoutes);
-
 const sendEmail = require('./api/mailer');
-
 dotenv.config();
-
 const { createClient } = require('@supabase/supabase-js');
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 app.use(cors({
-    origin : ["http://localhost:3000","https://hospital.vercel.app"],
+    origin : ["http://localhost:3000","https://carewell-xi.vercel.app/"],
     methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
     credentials: true
 }))
@@ -83,6 +78,8 @@ app.post("/mailer", async(req,res)=>{
     }
 })
 
+app.use('/api/authorization', authorizationRoutes);
+app.use('/api/appointments', appointmentsRoutes);
 app.get('/', (req, res) => 
 {  
     return res.status(200).json({

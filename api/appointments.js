@@ -12,7 +12,6 @@ const { promises } = require('nodemailer/lib/xoauth2');
 async function Mail(doctorID, patientID, date, time) {
    // console.log("patientID:", patientID);
     //console.log("doctorID:", doctorID);
-    
     let patientEmail, doctorEmail;
     let patientName,doctorName;
     try {
@@ -112,9 +111,6 @@ async function fetchAppointments(req,res,next)
 router.post("/book",fetchAppointments,async (req, res) => 
 {
     const { patientID, doctorID, date} = req.body;
-    //console.log("GET /book appointments:", req.appointments);
-
-    //console.log(req.appointments)
     const timeslot = []
     for(var i=0;i<req.appointments.length;i++)
         {
@@ -122,13 +118,11 @@ router.post("/book",fetchAppointments,async (req, res) =>
             timeslot.push(hours * 60 + minutes)
         }
     timeslot.sort((a,b)=>a-b);
-    //console.log(timeslot)
     var availtimeslot = null;
     var flag = 0;
     for(var i=0;i<timeslot.length-1;i++)
         {
             var gap = timeslot[i+1]-timeslot[i]
-            //console.log(gap)
             if(gap>=120)
                 {
                     let availableSlot = timeslot[i] + 60; 
@@ -149,7 +143,6 @@ router.post("/book",fetchAppointments,async (req, res) =>
                 let newslot = timeslot[timeslot.length - 1]; 
                 let hours = Math.floor(newslot / 60);         
                 let minutes = newslot % 60;                    
-                //console.log(hours,minutes)
                 hours += 1;  
                 availtimeslot = `${hours}:${minutes.toString().padStart(2, '0')}`;  
             }
@@ -165,8 +158,6 @@ router.post("/book",fetchAppointments,async (req, res) =>
             console.error("Supabase insert error:", error);
             return res.status(500).json({ err: error.message });
         }
-        
-        //console.log("Inserted appointment:", data);
         await Mail(doctorID,patientID,date,availtimeslot)
         return res.status(200).json({ 
             success: true, 
@@ -177,6 +168,40 @@ router.post("/book",fetchAppointments,async (req, res) =>
         return res.status(500).json({ err: err.message });
     }
 });
+
+router.get("/getdoctors",async (req,res)=>{
+    const {departmentid} = req.body;
+    console.log(departmentid)
+    try{
+        const { data, error } = await supabase
+        .from('departments')
+        .select(`
+            departmentid,
+            departmentname,
+            doctors (
+              doctorid,
+              doctorname,
+              departmentid
+            )
+          `)
+          .eq('departmentid',departmentid)
+        
+        if(error){
+            return res.status(500).json({err:err.message})
+        }
+        if(!data){
+            return res.status(200).json({"status":"failure",message:"no doctor available"})
+        }
+        const doctordata = data[0].doctors.map(doc=>({
+            doctorID:doc.doctorid,
+            doctorName:doc.doctorname
+        }))
+        return res.status(200).json({"status":"success","doctordata":doctordata})
+        
+    }catch(err){
+        return res.status(500).json({err:err.message})
+    }
+})
 
 router.get("/getappointments", async (req, res) => {
     try {
@@ -202,7 +227,6 @@ router.get("/getappointments", async (req, res) => {
 
 
 router.get("/:id", async (req, res) => {
-    //console.log("INSIDE get appointments api");
     const { id } = req.params;
     try {
         const { data, error } = await supabase

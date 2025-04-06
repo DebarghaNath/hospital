@@ -7,9 +7,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const express = require('express')
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const { randomBytes } = require('crypto');
 const SECRET_KEY = process.env.JWT_SECRET
 const sendMail = require('./mailer')
+
 async function Mail(email,message){
     try{
         sendMail(email,message);
@@ -20,11 +20,17 @@ async function Mail(email,message){
 }
 function generatToken(user){
     const payload={
-        username:user.username,
+        role:user.role,
         email:user.email
     }
     const token = jwt.sign(payload,SECRET_KEY);
     return token;
+}
+function deconstructToken(token){
+    const base64url = token.split('.')[1]
+    const base64 = base64url.replace(/-/g,'+').replace(/_/g,'/')
+    const payload = JSON.parse(atob(base64))
+    return payload
 }
 function generatePassWord(length)
 {
@@ -48,23 +54,34 @@ function generatePassWord(length)
 }
 
 router.post("/login", async (req, res) => {
-    const { email, password } = req.body;  
+    const { email, password,role} = req.body; 
+    const token = generatToken(req.body)
     try {
         const { data, error } = await supabase
             .from('users')
             .select('*')
             .eq('email', email)
             .eq('password', password)
+            .eq('role',role)
             .single(); 
         if (error) {
-            console.error('Supabase query error:', error);
             return res.status(500).json({ err: error.message });  
         }
         if (!data) {
             return res.status(404).json({ err: "User not found" });
         }
+        const {update_data,update_error} = await supabase
+            .from('users')
+            .update({"token":token})
+            .eq("email",email)
+            .eq("password",password)
+            .eq("role",role)
 
-        return res.status(200).json({ success: true, user: data });
+        if(update_error){
+            console.log("HELLO")
+            return res.status(500).json({err:update_error.message})
+        }
+        return res.status(200).json({ success: true, "token":token });
 
     } catch (err) {
         console.error('Server error:', err);
@@ -72,19 +89,12 @@ router.post("/login", async (req, res) => {
     }
 });
 
-
 router.post("/signup",async (req,res)=>{
-    const {name, email, age, weight, gender,bloodgroup,totalcharges,patientcontact,patientaddress} = req.body;
-    const userdata=
-    {
-        "username": name,
-        "email":email
-    }
-    const token = generatToken(userdata)
+    const {name, email, age, weight, gender,totalcharges,patientcontact,patientaddress,aadhaar} = req.body;
     try{
         const {data,error} = await supabase
         .from('patients')
-        .insert([{patientname:name,email:email,age:age,weight:weight,gender:gender,bloodgroup:bloodgroup,totalcharges:totalcharges,patientcontact:patientcontact,patient_address:patientaddress,token:token}])
+        .insert([{patientname:name,email:email,age:age,weight:weight,gender:gender,totalcharges:totalcharges,patientcontact:patientcontact,patient_address:patientaddress,aadhaar:aadhaar}])
         .select()
 
         if(error){
@@ -93,12 +103,39 @@ router.post("/signup",async (req,res)=>{
         }
         user = data[0]; 
 
-        return res.status(200).json({"success":true,"role":"patient","token":token})
+        return res.status(200).json({"success":true,"role":"patient"})
     }catch(err){
         res.status(500).json({err:err.message})
     }
 
 });
+
+router.get("/checkaadhaar",async (req,res)=>{
+    const {aadhaar} = req.body
+    if(aadhaar.length!=12){
+        return res.status(500).json({err:"Aadhaar number must be 12 digit"})
+    }
+    try{
+        const {data,error} = await supabase
+        .from('patients')
+        .select('*')
+        .eq('aadhaar',aadhaar)
+        .single()
+
+        if(data==null){
+            return res.status(200).json({"status":"failure"})
+        }
+        else if(data.length!=0){
+            return res.status(200).json({"status":"success","patientid":data.patientid})
+        }
+        else{
+            return res.status(500).json({err:error.message})
+        }
+        
+    }catch(err){
+        return res.status(500).json({err:err.message})
+    }   
+})
 router.put("/submit-password", async (req, res) => {
     const { email, password } = req.body;
 
