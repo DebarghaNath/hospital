@@ -52,7 +52,33 @@ function generatePassWord(length)
     return password;
 
 }
+async function checkValid(req,res,next)
+{
+    const token = req.headers['token'];
+    if(!token){
+        return res.status(401).json({err:"token missing"})
+    }
+    try{
+        const payload = deconstructToken(token);
+        const {role,email} = payload
+        const {data,error} = await supabase
+        .from('users')
+        .select('*')
+        .eq('role',role)
+        .eq('email',email)
 
+        if(error){
+            res.status(500).json({err:err.message})
+        }
+        if (!data || data.length === 0) {
+            return res.status(401).json({ status: "failure", message: "Invalid token credentials" });
+        }
+        next();
+    }catch(err){
+        res.status(500).json({err:err.message})
+    }
+
+}
 router.post("/login", async (req, res) => {
     const { email, password,role} = req.body; 
     const token = generatToken(req.body)
@@ -89,7 +115,7 @@ router.post("/login", async (req, res) => {
     }
 });
 
-router.post("/signup",async (req,res)=>{
+router.post("/signup",checkValid,async (req,res)=>{
     const {name, email, age, weight, gender,totalcharges,patientcontact,patientaddress,aadhaar} = req.body;
     try{
         const {data,error} = await supabase
@@ -110,7 +136,7 @@ router.post("/signup",async (req,res)=>{
 
 });
 
-router.get("/checkaadhaar",async (req,res)=>{
+router.get("/checkaadhaar",checkValid,async (req,res)=>{
     const {aadhaar} = req.body
     if(aadhaar.length!=12){
         return res.status(500).json({err:"Aadhaar number must be 12 digit"})
@@ -136,7 +162,7 @@ router.get("/checkaadhaar",async (req,res)=>{
         return res.status(500).json({err:err.message})
     }   
 })
-router.put("/submit-password", async (req, res) => {
+router.put("/submit-password",checkValid,async (req, res) => {
     const { email, password } = req.body;
 
     try {
@@ -159,7 +185,7 @@ router.put("/submit-password", async (req, res) => {
     }
 });
 
-router.put("/addusers",async (req,res)=>{
+router.put("/addusers",checkValid,async (req,res)=>{
     const {name,email,mobile,role} = req.body;
     const password = generatePassWord(12);
 
@@ -179,7 +205,7 @@ router.put("/addusers",async (req,res)=>{
     }
 })
 
-router.delete("/deleteusers",async(req,res)=>{
+router.delete("/deleteusers",checkValid,async(req,res)=>{
     const {id} = req.body;
     try{
         const {data,error} = await supabase
@@ -197,25 +223,7 @@ router.delete("/deleteusers",async(req,res)=>{
     }
 })
 
-router.delete("/deleteusers",async(req,res)=>{
-    const {id} = req.body;
-    try{
-        const {data,error} = await supabase
-        .from('users')
-        .delete()
-        .eq('userid',id)
-
-        if(error){
-            return res.status(500).json({err:err.message})
-        }
-
-        return res.status(200).json({"status":"done"})
-    }catch(err){
-        return res.status(500).json({err:err.message})
-    }
-})
-
-router.get('/showusers',async(req,res)=>{
+router.get('/showusers',checkValid,async(req,res)=>{
     try{
         const {data,error} = await supabase
         .from('users')
