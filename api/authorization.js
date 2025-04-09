@@ -80,7 +80,7 @@ async function checkValid(req,res,next)
 
 }
 router.post("/login", async (req, res) => {
-    const { email, password,role} = req.body; 
+    const { email, password,role } = req.body; 
     const token = generatToken(req.body)
     try {
         const { data, error } = await supabase
@@ -104,7 +104,7 @@ router.post("/login", async (req, res) => {
             .eq("role",role)
 
         if(update_error){
-            console.log("HELLO")
+            //console.log("HELLO")
             return res.status(500).json({err:update_error.message})
         }
         return res.status(200).json({ success: true, "token":token });
@@ -114,6 +114,27 @@ router.post("/login", async (req, res) => {
         return res.status(500).json({ err: err.message });  
     }
 });
+router.get("/getdetails",checkValid,async(req,res)=>{
+    const {token} = req.body;
+    //console.log(token)
+    try{
+        const{data,error} = await supabase
+        .from('users')
+        .select('*')
+        .eq('token',token)
+
+        console.log(data)
+        if(!data){
+            return res.status(500).json({err:"No such users found"})
+        }
+        if(error){
+            return res.status(500).json({err:error.message})
+        }
+        return res.status(200).json({"status":"success","data":data})
+    }catch(err){
+        return res.status(500).json({err:err.message})
+    }
+})
 
 router.post("/signup",checkValid,async (req,res)=>{
     const {name, email, age, weight, gender,totalcharges,patientcontact,patientaddress,aadhaar} = req.body;
@@ -184,9 +205,9 @@ router.put("/submit-password",checkValid,async (req, res) => {
         return res.status(500).json({ error: err.message });
     }
 });
-
+  
 router.put("/addusers",checkValid,async (req,res)=>{
-    const {name,email,mobile,role} = req.body;
+    const {name,email,mobile,role,departmentname} = req.body;
     const password = generatePassWord(12);
 
     try{
@@ -199,6 +220,19 @@ router.put("/addusers",checkValid,async (req,res)=>{
         }
         const message = `You are given the role : ${role} and your new password is : ${password}`
         await Mail(email,message)
+        if(departmentname!=null)
+        {
+            const {data,error} = await supabase
+            .rpc('insert_doctor_with_department', {
+                name: name,
+                email: email,
+                mobile: mobile,
+                department_name: departmentname
+              });
+            if(error){
+                return res.status(500).json({error:error.message})
+            }
+        }
         return res.status(200).json({"status":"done"})
     }catch(err){
         return res.status(500).json({err:err.message})
