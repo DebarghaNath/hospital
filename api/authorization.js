@@ -178,7 +178,7 @@ router.post("/signup",checkValid,async (req,res)=>{
 });
 
 router.get("/checkaadhaar",checkValid,async (req,res)=>{
-    const {aadhaar} = req.body
+    const {aadhaar} = req.query;
     if(aadhaar.length!=12){
         return res.status(500).json({err:"Aadhaar number must be 12 digit"})
     }
