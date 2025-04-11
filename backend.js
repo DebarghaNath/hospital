@@ -82,6 +82,11 @@ app.post("/mailer", async(req,res)=>{
 app.use('/api/authorization', authorizationRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/rooms',roomsRoutes)
+
+// Doctors
+const doctorRoutes = require('./api/doctor');
+app.use('/api/doctor',doctorRoutes)
+
 app.get('/', (req, res) => 
 {  
     return res.status(200).json({
