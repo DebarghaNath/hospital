@@ -23,14 +23,16 @@ function generatToken(user){
         role:user.role,
         email:user.email
     }
-    const token = jwt.sign(payload,SECRET_KEY);
+    const token = jwt.sign(payload,SECRET_KEY, { expiresIn: '1h' });
     return token;
 }
 function deconstructToken(token){
-    const base64url = token.split('.')[1]
-    const base64 = base64url.replace(/-/g,'+').replace(/_/g,'/')
-    const payload = JSON.parse(atob(base64))
-    return payload
+    try {
+        const payload = jwt.verify(token, SECRET_KEY);
+        return payload;
+    } catch (err) {
+        throw new Error('Invalid or expired token');
+    }
 }
 function generatePassWord(length)
 {
@@ -52,30 +54,47 @@ function generatePassWord(length)
     return password;
 
 }
-async function checkValid(req,res,next)
-{
-    const token = req.headers['token'];
-    if(!token){
-        return res.status(401).json({err:"token missing"})
-    }
-    try{
+
+async function validateToken(token) {
+    try {
         const payload = deconstructToken(token);
-        const {role,email} = payload
+        const {role,email} = payload;
+
         const {data,error} = await supabase
         .from('users')
         .select('*')
         .eq('role',role)
         .eq('email',email)
+        .eq('token',token);
 
+        console.log(data);
         if(error){
-            res.status(500).json({err:err.message})
+            throw new Error(error.message);
         }
         if (!data || data.length === 0) {
-            return res.status(401).json({ status: "failure", message: "Invalid token credentials" });
+            throw new Error("Invalid token credentials");
         }
+        return data[0];
+    } catch (err) {
+        throw new Error(err.message);
+    }
+}
+async function checkValid(req,res,next)
+{
+    // const token = req.headers['token'];
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({err: "Authorization header missing or invalid"});
+    }
+    const token = authHeader.split(' ')[1];
+
+    try{
+        const user = await validateToken(token);
+        console.log(user);
+        req.user = user;
         next();
     }catch(err){
-        res.status(500).json({err:err.message})
+        return res.status(401).json({err:err.message})
     }
 
 }
@@ -115,22 +134,23 @@ router.post("/login", async (req, res) => {
     }
 });
 router.get("/getdetails",checkValid,async(req,res)=>{
-    const {token} = req.body;
     //console.log(token)
     try{
+        console.log(req.user);
         const{data,error} = await supabase
         .from('users')
         .select('*')
-        .eq('token',token)
+        .eq('token', req.user.token)
 
+        console.log("data");
         console.log(data)
-        if(!data){
+        if(!data || data.length === 0){
             return res.status(500).json({err:"No such users found"})
         }
         if(error){
             return res.status(500).json({err:error.message})
         }
-        return res.status(200).json({"status":"success","data":data})
+        return res.status(200).json({"status":"success","data":data[0]})
     }catch(err){
         return res.status(500).json({err:err.message})
     }
@@ -152,7 +172,7 @@ router.post("/signup",checkValid,async (req,res)=>{
 
         return res.status(200).json({"success":true,"role":"patient"})
     }catch(err){
-        res.status(500).json({err:err.message})
+        return res.status(500).json({err:err.message})
     }
 
 });
