@@ -8,6 +8,62 @@ const express = require('express')
 const router = express.Router();
 const sendEmail = require('./mailer');
 const { promises } = require('nodemailer/lib/xoauth2');
+const jwt = require('jsonwebtoken');
+const SECRET_KEY = process.env.JWT_SECRET
+
+function deconstructToken(token){
+    try {
+        const payload = jwt.verify(token, SECRET_KEY);
+        return payload;
+    } catch (err) {
+        throw new Error('Invalid or expired token');
+    }
+}
+
+async function validateToken(token) {
+    try {
+        const payload = deconstructToken(token);
+        const {role,email} = payload;
+
+        const {data,error} = await supabase
+        .from('users')
+        .select('*')
+        .eq('role',role)
+        .eq('email',email)
+        .eq('token',token);
+
+        console.log(data);
+        if(error){
+            throw new Error(error.message);
+        }
+        if (!data || data.length === 0) {
+            throw new Error("Invalid token credentials");
+        }
+        return data[0];
+    } catch (err) {
+        throw new Error(err.message);
+    }
+}
+
+async function checkValid(req,res,next)
+{
+    // const token = req.headers['token'];
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({err: "Authorization header missing or invalid"});
+    }
+    const token = authHeader.split(' ')[1];
+
+    try{
+        const user = await validateToken(token);
+        console.log(user);
+        req.user = user;
+        next();
+    }catch(err){
+        return res.status(401).json({err:err.message})
+    }
+
+}
 
 async function Mail(doctorID, patientID, date, time) {
     let patientEmail, doctorEmail;
@@ -99,7 +155,7 @@ async function fetchAppointments(req,res,next)
     }
 }
 
-router.post("/book",fetchAppointments,async (req, res) => 
+router.post("/book", checkValid, fetchAppointments,async (req, res) => 
 {
     const { patientID, doctorID, date} = req.body;
     const timeslot = []
@@ -160,7 +216,7 @@ router.post("/book",fetchAppointments,async (req, res) =>
     }
 });
 
-router.get("/getdoctors",async (req,res)=>{
+router.get("/getdoctors", checkValid, async (req,res)=>{
     const {departmentname} = req.body;
     try{
         const { data, error } = await supabase
@@ -193,30 +249,53 @@ router.get("/getdoctors",async (req,res)=>{
     }
 })
 
-router.get("/getappointments", async (req, res) => {
+router.get("/getappointments", checkValid, async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('appointments')
-            .select('*'); 
-    
+            .select(`
+                appointmentid,
+                patientid,
+                doctorid,
+                date,
+                time,
+                type,
+                status,
+                patients (patientname),
+                doctors (doctorname)
+                departments (departmentname)
+            `);
+
         if (error) {
             console.error('Supabase fetch error:', error);
             return res.status(500).json({ error: error.message });
         }
-    
+
         if (!data || data.length === 0) {
             console.log("No appointments found");
             return res.status(404).json({ error: "Appointments not found" });
         }
-    
-        return res.status(200).json({ appointmentDetails: data });
+
+        const formattedAppointments = data.map((appointment) => ({
+            appointmentid: appointment.appointmentid,
+            patientid: appointment.patientid,
+            patientname: appointment.patients?.patientname || "Unknown",
+            doctorid: appointment.doctorid,
+            doctorname: appointment.doctors?.doctorname || "Unknown",
+            departmentname: appointment.departments?.departmentname || "Unknown",
+            date: appointment.date,
+            time: appointment.time,
+            type: appointment.type,
+            status: appointment.status,
+        }));
+
+        return res.status(200).json({ appointmentDetails: formattedAppointments });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
 });
 
-
-router.get("/:id", async (req, res) => {
+router.get("/:id", checkValid, async (req, res) => {
     const { id } = req.params;
     try {
         const { data, error } = await supabase
@@ -242,7 +321,7 @@ router.get("/:id", async (req, res) => {
     }
 });
 
-router.delete("/:id/cancel", async (req, res) => {
+router.delete("/:id/cancel", checkValid, async (req, res) => {
     const { id } = req.params;
     try {
         const { data, error } = await supabase

@@ -23,7 +23,7 @@ function generatToken(user){
         role:user.role,
         email:user.email
     }
-    const token = jwt.sign(payload,SECRET_KEY, { expiresIn: '1h' });
+    const token = jwt.sign(payload,SECRET_KEY, { expiresIn: '14d' });
     return token;
 }
 function deconstructToken(token){
@@ -157,11 +157,11 @@ router.get("/getdetails",checkValid,async(req,res)=>{
 })
 
 router.post("/signup",checkValid,async (req,res)=>{
-    const {name, email, age, weight, gender,totalcharges,patientcontact,patientaddress,aadhaar} = req.body;
+    const {name, email, age, weight, gender,patientcontact,patientaddress,aadhaar} = req.body;
     try{
         const {data,error} = await supabase
         .from('patients')
-        .insert([{patientname:name,email:email,age:age,weight:weight,gender:gender,totalcharges:totalcharges,patientcontact:patientcontact,patient_address:patientaddress,aadhaar:aadhaar}])
+        .insert([{patientname:name,email:email,age:age,weight:weight,gender:gender,patientcontact:patientcontact,patient_address:patientaddress,aadhaar:aadhaar}])
         .select()
 
         if(error){
@@ -175,6 +175,32 @@ router.post("/signup",checkValid,async (req,res)=>{
         return res.status(500).json({err:err.message})
     }
 
+});
+
+router.put("/logout", checkValid, async (req, res) => {
+    try {
+        const user = req.user;
+
+        const { data, error } = await supabase
+            .from('users')
+            .update({ lastlogout: new Date().toISOString() }) 
+            .eq('userid', user.userid) 
+            .select();
+
+        if (error) {
+            console.error("Supabase update error:", error);
+            return res.status(500).json({ err: error.message });
+        }
+
+        if (!data || data.length === 0) {
+            return res.status(404).json({ err: "User not found" });
+        }
+
+        return res.status(200).json({ success: true, message: "Logout time updated successfully" });
+    } catch (err) {
+        console.error("Server error:", err);
+        return res.status(500).json({ err: err.message });
+    }
 });
 
 router.get("/checkaadhaar",checkValid,async (req,res)=>{
@@ -203,7 +229,7 @@ router.get("/checkaadhaar",checkValid,async (req,res)=>{
         return res.status(500).json({err:err.message})
     }   
 })
-router.put("/submit-password",checkValid,async (req, res) => {
+router.put("/submit-password", async (req, res) => {
     const { email, password } = req.body;
 
     try {
@@ -236,7 +262,7 @@ router.put("/addusers",checkValid,async (req,res)=>{
         .insert([{name:name,email:email,mobile:mobile,role:role,password:password}])
         .select()
         if(error){
-            return res.status(500).json({err:error,message})
+            return res.status(500).json({err:error.message})
         }
         const message = `You are given the role : ${role} and your new password is : ${password}`
         await Mail(email,message)
@@ -250,7 +276,7 @@ router.put("/addusers",checkValid,async (req,res)=>{
                 department_name: departmentname
               });
             if(error){
-                return res.status(500).json({error:error.message})
+                return res.status(500).json({err:error.message})
             }
         }
         return res.status(200).json({"status":"done"})
@@ -268,7 +294,7 @@ router.delete("/deleteusers",checkValid,async(req,res)=>{
         .eq('userid',id)
 
         if(error){
-            return res.status(500).json({err:err.message})
+            return res.status(500).json({err:error.message})
         }
 
         return res.status(200).json({"status":"done"})
@@ -284,7 +310,7 @@ router.get('/showusers',checkValid,async(req,res)=>{
         .select('*')
 
         if(error){
-            return res.status(500).json({err:err.message})
+            return res.status(500).json({err:error.message})
         }
         return res.status(200).json({"data":data})
     }catch(err){

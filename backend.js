@@ -16,7 +16,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 app.use(cors({
-    origin : ["http://localhost:5173","https://carewell-xi.vercel.app,https://carewell-future.netlify.app"],
+    origin : ["http://localhost:5173", "https://carewell-xi.vercel.app" ,"https://carewell-future.netlify.app"],
     methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
     credentials: true
 }))
