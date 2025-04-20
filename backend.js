@@ -8,7 +8,10 @@ const cron = require('node-cron')
 app.use(express.json());
 const appointmentsRoutes = require('./api/appointments'); 
 const authorizationRoutes = require('./api/authorization');
-const roomsRoutes = require('./api/rooms')
+const roomsRoutes = require('./api/rooms');
+const patientRoutes = require('./api/patient');
+const doctorRoutes = require('./api/doctor');
+const testRoutes = require('./api/test');
 const sendEmail = require('./api/mailer');
 dotenv.config();
 const { createClient } = require('@supabase/supabase-js');
@@ -81,11 +84,10 @@ app.post("/mailer", async(req,res)=>{
 
 app.use('/api/authorization', authorizationRoutes);
 app.use('/api/appointments', appointmentsRoutes);
-app.use('/api/rooms',roomsRoutes)
-
-// Doctors
-const doctorRoutes = require('./api/doctor');
-app.use('/api/doctor',doctorRoutes)
+app.use('/api/rooms',roomsRoutes);
+app.use('/api/patient',patientRoutes);
+app.use('/api/doctor',doctorRoutes);
+app.use('/api/test',testRoutes);
 
 app.get('/', (req, res) => 
 {  

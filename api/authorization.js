@@ -9,6 +9,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const SECRET_KEY = process.env.JWT_SECRET
 const sendMail = require('./mailer')
+const twilio = require('twilio');
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 async function Mail(email,message){
     try{
@@ -117,7 +119,10 @@ router.post("/login", async (req, res) => {
         }
         const {update_data,update_error} = await supabase
             .from('users')
-            .update({"token":token})
+            .update({
+                token: token,
+                lastlogin: new Date().toISOString() // Set current timestamp
+            })
             .eq("email",email)
             .eq("password",password)
             .eq("role",role)
@@ -133,6 +138,7 @@ router.post("/login", async (req, res) => {
         return res.status(500).json({ err: err.message });  
     }
 });
+
 router.get("/getdetails",checkValid,async(req,res)=>{
     //console.log(token)
     try{
@@ -156,25 +162,76 @@ router.get("/getdetails",checkValid,async(req,res)=>{
     }
 })
 
-router.post("/signup",checkValid,async (req,res)=>{
-    const {name, email, age, weight, gender,patientcontact,patientaddress,aadhaar} = req.body;
-    try{
-        const {data,error} = await supabase
-        .from('patients')
-        .insert([{patientname:name,email:email,age:age,weight:weight,gender:gender,patientcontact:patientcontact,patient_address:patientaddress,aadhaar:aadhaar}])
-        .select()
+router.post('/send-otp', async (req, res) => {
+    const { phoneNumber } = req.body;
 
-        if(error){
-            console.error('Supabase query error:', error);
-            return res.status(500).json({ err: error.message }); 
-        }
-        user = data[0]; 
+    if (!phoneNumber) return res.status(400).json({ error: 'Phone number is required' });
 
-        return res.status(200).json({"success":true,"role":"patient"})
-    }catch(err){
-        return res.status(500).json({err:err.message})
+    const otp = Math.floor(100000 + Math.random() * 900000); // Generate 6-digit OTP
+
+    try {
+        await client.messages.create({
+        body: `Your OTP is ${otp}`,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: `+91${phoneNumber}`, 
+        });
+
+        res.status(200).json({ success: true, message: 'OTP sent', otp }); // Don't send OTP in prod
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to send OTP', details: err.message });
     }
+});
 
+router.post("/signup", checkValid, async (req, res) => {
+    const { name, email, age, weight, gender, patientcontact, patientaddress, aadhaar } = req.body;
+
+    try {
+        const { data: existingPatients, error: fetchError } = await supabase
+            .from("patients")
+            .select("patientid");
+
+        if (fetchError) {
+            console.error("Error fetching patient IDs:", fetchError.message);
+            return res.status(500).json({ err: fetchError.message });
+        }
+
+        const existingIds = existingPatients.map((patient) => patient.patientid).sort((a, b) => a - b);
+
+        let patientid = 1;
+        for (const id of existingIds) {
+            if (id === patientid) {
+                patientid++;
+            } else {
+                break;
+            }
+        }
+
+        const { data, error } = await supabase
+            .from("patients")
+            .insert([{
+                patientid: patientid,
+                patientname: name,
+                email: email,
+                age: age,
+                weight: weight,
+                gender: gender,
+                patientcontact: patientcontact,
+                patient_address: patientaddress,
+                aadhaar: aadhaar,
+                additiontime: new Date().toISOString()
+            }])
+            .select();
+
+        if (error) {
+            console.error("Supabase query error:", error);
+            return res.status(500).json({ err: error.message });
+        }
+
+        return res.status(200).json({ success: true, role: "patient", patientid: patientid });
+    } catch (err) {
+        console.error("Server error:", err);
+        return res.status(500).json({ err: err.message });
+    }
 });
 
 router.put("/logout", checkValid, async (req, res) => {
@@ -259,7 +316,7 @@ router.put("/addusers",checkValid,async (req,res)=>{
     try{
         const {data,error} = await supabase
         .from('users')
-        .insert([{name:name,email:email,mobile:mobile,role:role,password:password}])
+        .insert([{name:name,email:email,mobile:mobile,role:role,password:password,additiontime:new Date().toISOString(),imageurl: "https://res.cloudinary.com/dkymldtg7/image/upload/v1744894151/uploads/hdolgshglut7mqq6vzzw.jpg"}])
         .select()
         if(error){
             return res.status(500).json({err:error.message})
@@ -273,7 +330,7 @@ router.put("/addusers",checkValid,async (req,res)=>{
                 name: name,
                 email: email,
                 mobile: mobile,
-                department_name: departmentname
+                department_name: departmentname,
               });
             if(error){
                 return res.status(500).json({err:error.message})

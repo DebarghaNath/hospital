@@ -157,7 +157,7 @@ async function fetchAppointments(req,res,next)
 
 router.post("/book", checkValid, fetchAppointments,async (req, res) => 
 {
-    const { patientID, doctorID, date} = req.body;
+    const { patientID, doctorID, date, type, priority} = req.body;
     const timeslot = []
     for(var i=0;i<req.appointments.length;i++)
         {
@@ -198,7 +198,7 @@ router.post("/book", checkValid, fetchAppointments,async (req, res) =>
     try {
         const { data, error } = await supabase
             .from("appointments")
-            .insert([{ patientid: patientID, doctorid: doctorID, date: date, time: availtimeslot }])
+            .insert([{ patientid: patientID, doctorid: doctorID, date: date, time: availtimeslot, type: type, priority: priority }])
             .select("appointmentid");
         
         if (error) {
@@ -209,6 +209,7 @@ router.post("/book", checkValid, fetchAppointments,async (req, res) =>
         return res.status(200).json({ 
             success: true, 
             appointmentid: data[0].appointmentid, 
+            appointmentTime: availtimeslot,
         });
     } catch (err) {
         console.log("HERE")
@@ -217,7 +218,8 @@ router.post("/book", checkValid, fetchAppointments,async (req, res) =>
 });
 
 router.get("/getdoctors", checkValid, async (req,res)=>{
-    const {departmentname} = req.body;
+    const {departmentname} = req.query;
+    console.log(departmentname)
     try{
         const { data, error } = await supabase
         .from('departments')
@@ -238,6 +240,7 @@ router.get("/getdoctors", checkValid, async (req,res)=>{
         if(!data){
             return res.status(200).json({"status":"failure",message:"no doctor available"})
         }
+        console.log(data)
         const doctordata = data[0].doctors.map(doc=>({
             doctorID:doc.doctorid,
             doctorName:doc.doctorname

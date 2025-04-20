@@ -8,6 +8,56 @@ const express = require('express')
 const router = express.Router();
 
 // GET
+router.get("/", (req, res) => {
+    console.log("test api");
+    return res.status(200).json({success:"success"});
+})
+
+// Get all appointments of a doctor
+router.get("/:doctorid/appointments", async (req, res) => {
+    const { doctorid } = req.params;
+
+    try {
+        const { data: appointments, error } = await supabase
+            .from('appointments')
+            .select(`
+                appointmentid,
+                patientid,
+                date,
+                time,
+                priority,
+                disease,
+                patients (patientname, age, gender, weight, imageurl)
+            `)
+            .eq('doctorid', doctorid)
+            .order('date', { ascending: false })
+            .order('time', { ascending: false });
+
+        if (error) {
+            console.error("Supabase fetch error:", error);
+            return res.status(500).json({ err: error.message });
+        }
+
+        if (!appointments || appointments.length === 0) {
+            return res.status(404).json({ error: "No appointments found for this doctor" });
+        }
+
+        const formattedAppointments = appointments.map((appointment) => ({
+            appointmentid: appointment.appointmentid,
+            patientid: appointment.patientid,
+            date: appointment.date,
+            time: appointment.time,
+            priority: appointment.priority,
+            disease: appointment.disease,
+            ...appointment.patients,
+        }));
+
+        return res.status(200).json({ status: "success", appointments: formattedAppointments });
+    } catch (err) {
+        console.error("Error fetching appointments:", err.message);
+        return res.status(500).json({ err: err.message });
+    }
+});
 
 // All patients under a given Doctor
 router.get("/:doctorid/patient",async (req,res)=>{
@@ -19,7 +69,9 @@ router.get("/:doctorid/patient",async (req,res)=>{
                 patientid,
                 date,
                 time,
-                patients (patientname)
+                priority,
+                disease,
+                patients (patientname, age, weight, gender, imageurl)
             `)
             .eq('doctorid',doctorid)
             .order('date',{ascending: false}) 
@@ -32,16 +84,16 @@ router.get("/:doctorid/patient",async (req,res)=>{
             return res.status(404).json({error:"(Doctor,Patient) not found"})
         }
 
-        let store = new Map();
-        for(let patient of data){
-            store.set(patient.patientid,patient);
-        }
-        let uniquePatients = [];
-        for(let [patientid,patient] of store){
-            uniquePatients.push(patient);
-        }
+        const formattedData = data.map((appointment) => ({
+            patientid: appointment.patientid,
+            date: appointment.date,
+            time: appointment.time,
+            priority: appointment.priority,
+            disease: appointment.disease,
+            ...appointment.patients, 
+        }));
 
-        return res.status(200).json({"status":"success","patientdata":uniquePatients})
+        return res.status(200).json({"status":"success","patientdata":formattedData})
         
     }
     catch(err){
@@ -52,6 +104,9 @@ router.get("/:doctorid/patient",async (req,res)=>{
 // Single patient for a given Doctor
 router.get("/:doctorid/patient/:patientid",async (req,res)=>{
     const {doctorid,patientid} = req.params;
+    console.log(doctorid);
+    console.log(patientid);
+
     try{
         const { data:patientData, error:patientError } = await supabase
             .from('patients')
@@ -67,11 +122,7 @@ router.get("/:doctorid/patient/:patientid",async (req,res)=>{
 
         const { data:appointmentData, error:appointmentError } = await supabase
             .from('appointments')
-            .select(`
-                appointmentid,
-                date,
-                time
-            `)
+            .select('*')
             .eq('doctorid',doctorid)
             .eq('patientid',patientid)
             .order('date',{ascending: false}) 
@@ -86,12 +137,7 @@ router.get("/:doctorid/patient/:patientid",async (req,res)=>{
 
         const { data:prescriptionData, error:prescriptionError } = await supabase
             .from('prescriptions')
-            .select(`
-                medicinename,
-                dosage,
-                frequency,
-                duration
-            `)
+            .select('*')
             .eq('doctorid',doctorid)
             .eq('patientid',patientid)
 
@@ -100,7 +146,7 @@ router.get("/:doctorid/patient/:patientid",async (req,res)=>{
         }
 
         const data = {patientData, appointmentData, prescriptionData};
-
+        console.log(data);
         return res.status(200).json({"status":"success",data})
         
     }
@@ -115,11 +161,11 @@ router.get("/:doctorid/patient/:patientid",async (req,res)=>{
 router.post("/:doctorid/patient/:patientid/prescription",async (req, res) => 
 {
     const {doctorid,patientid} = req.params;
-    const {medicinename,dosage,frequency,duration} = req.body;
+    const {medicinename,dosage,frequency,duration,notes,startdate} = req.body;
     try{
         const { error:postError } = await supabase
             .from("prescriptions")
-            .insert({doctorid, patientid, medicinename, dosage, frequency, duration})
+            .insert({doctorid, patientid, medicinename, dosage, notes, startdate, frequency, duration})
         
         if (postError) {
             console.error("Supabase insert error:", postError);

@@ -10,9 +10,47 @@ const jwt = require('jsonwebtoken');
 const SECRET_KEY = process.env.JWT_SECRET
 const sendMail = require('./mailer')
 
+router.get("/admissions", async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('admit')
+            .select(`
+                doctorid,
+                patientid,
+                bedno,
+                admitdate,
+                dischargedate,
+                wardno,
+                patients (patientid, patientname, age, gender),
+                doctors (doctorid, doctorname, departmentid, departments (departmentid, departmentname))
+            `);
+
+        if (error) {
+            return res.status(500).json({ err: error.message });
+        }
+        console.log(data);
+        const transformedData = data.map((admission) => ({
+            patientid: admission.patientid,
+            doctorid: admission.doctorid,
+            patientname: admission.patients.patientname,
+            age: admission.patients.age,
+            gender: admission.patients.gender,
+            doctorname: admission.doctors.doctorname,
+            department: admission.doctors.departments.departmentname,
+            bedno: admission.bedno,
+            admitdate: admission.admitdate,
+            dischargedate: admission.dischargedate,
+            wardno: admission.wardno,
+        }));
+
+        return res.status(200).json({ status: "success", data: transformedData });
+    } catch (err) {
+        return res.status(500).json({ err: err.message });
+    }
+});
 
 router.post("/admitpatients",async (req,res)=>{
-    const {patientid,type} = req.body;
+    const {patientid,type,doctorid} = req.body;
     let wno = null;
     let bedno = 0;
     let cap = 0;
@@ -28,6 +66,7 @@ router.post("/admitpatients",async (req,res)=>{
         if(!data || data.length==0){
             return res.status(500).json({err:"No such ward exists"})
         }
+        console.log(data[0]);
         const {wardno,maxcapacity,remcapacity} = data[0]
         //console.log(wardno,maxcapacity,remcapacity)
         if(remcapacity==0){
@@ -45,7 +84,7 @@ router.post("/admitpatients",async (req,res)=>{
         .eq('wardno',wno)
 
         if(error){
-            return res.status(500).json({err:err.message})
+            return res.status(500).json({err:error.message})
         }
     }catch(err){
         return res.status(500).json({err:err.message})
@@ -81,13 +120,14 @@ router.post("/admitpatients",async (req,res)=>{
         return res.status(500).json({err:err.message})
     }
     try{
-        const timestmp =  new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+        // const timestmp =  new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+        const timestmp = new Date().toISOString();
         const {data,error} = await supabase
         .from('admit')
-        .insert([{patientid:patientid,admitdate:timestmp,wardno:wno,bedno:bedno,dischargedate:null}])
+        .insert([{patientid:patientid,admitdate:timestmp,wardno:wno,bedno:bedno,dischargedate:null,doctorid:doctorid}])
         .select('*')
         if(error){
-            return res.status(500).json({err:err.message})
+            return res.status(500).json({err:error.message})
         }
         return res.status(200).json({"status":"done",data:data})
     }catch(err){
