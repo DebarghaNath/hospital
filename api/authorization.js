@@ -286,61 +286,61 @@ router.get("/checkaadhaar",checkValid,async (req,res)=>{
         return res.status(500).json({err:err.message})
     }   
 })
-router.put("/submit-password", async (req, res) => {
-    const { email, password } = req.body;
 
+router.put("/addusers", checkValid, async (req, res) => {
+    const { name, email, mobile, role, departmentname } = req.body;
+    const password = generatePassWord(12);
+  
     try {
-        const {data,error } = await supabase
-            .from('users')
-            .update({ password: password }) 
-            .eq('email', email)
-            .select();
-        console.log(data)
-        if (error) {
-            return res.status(500).json({ error: error.message });
-        }
-        if(data.length==0)
-            {
-                return res.status(500).json({ error:"user not found" });   
-            }
-        return res.status(200).json({ success: true });
+      // — Insert the user, get back their userid
+      const { data: newUsers, error: insertErr } = await supabase
+        .from('users')
+        .insert([{
+          name,
+          email,
+          mobile,
+          role,
+          password,
+          additiontime: new Date().toISOString(),
+          imageurl: "https://res.cloudinary.com/dkymldtg7/image/upload/v1744894151/uploads/hdolgshglut7mqq6vzzw.jpg"
+        }])
+        .select();
+  
+      if (insertErr) throw insertErr;
+      const userid = newUsers[0].userid;
+  
+      // — Send them their password
+      await Mail(email, `Your role: ${role}\nYour new password: ${password}`);
+  
+      // — If they’re a doctor, create their doctor + link back
+      if (departmentname) {
+        const { data: rpcData, error: rpcErr } = await supabase
+          .rpc('insert_doctor_with_department', {
+            name,
+            email,
+            mobile,
+            department_name: departmentname
+          });
+  
+        if (rpcErr) throw rpcErr;
+        const doctorid = rpcData;  // the INTEGER we returned
+  
+        // — Update the user row with that doctorid
+        const { error: updErr } = await supabase
+          .from('users')
+          .update({ doctorid })
+          .eq('userid', userid);
+  
+        if (updErr) throw updErr;
+      }
+  
+      return res.status(200).json({ status: 'done' });
     } catch (err) {
-        return res.status(500).json({ error: err.message });
+      console.error(err);
+      return res.status(500).json({ error: err.message });
     }
 });
   
-router.put("/addusers",checkValid,async (req,res)=>{
-    const {name,email,mobile,role,departmentname} = req.body;
-    const password = generatePassWord(12);
-
-    try{
-        const {data,error} = await supabase
-        .from('users')
-        .insert([{name:name,email:email,mobile:mobile,role:role,password:password,additiontime:new Date().toISOString(),imageurl: "https://res.cloudinary.com/dkymldtg7/image/upload/v1744894151/uploads/hdolgshglut7mqq6vzzw.jpg"}])
-        .select()
-        if(error){
-            return res.status(500).json({err:error.message})
-        }
-        const message = `You are given the role : ${role} and your new password is : ${password}`
-        await Mail(email,message)
-        if(departmentname!=null)
-        {
-            const {data,error} = await supabase
-            .rpc('insert_doctor_with_department', {
-                name: name,
-                email: email,
-                mobile: mobile,
-                department_name: departmentname,
-              });
-            if(error){
-                return res.status(500).json({err:error.message})
-            }
-        }
-        return res.status(200).json({"status":"done"})
-    }catch(err){
-        return res.status(500).json({err:err.message})
-    }
-})
 
 router.delete("/deleteusers",checkValid,async(req,res)=>{
     const {id} = req.body;

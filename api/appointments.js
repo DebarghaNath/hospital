@@ -265,9 +265,11 @@ router.get("/getappointments", checkValid, async (req, res) => {
                 type,
                 status,
                 patients (patientname),
-                doctors (doctorname)
-                departments (departmentname)
-            `);
+                doctors (
+                    doctorname,
+                    departments (departmentname)
+                )
+            `);            
 
         if (error) {
             console.error('Supabase fetch error:', error);
@@ -276,7 +278,7 @@ router.get("/getappointments", checkValid, async (req, res) => {
 
         if (!data || data.length === 0) {
             console.log("No appointments found");
-            return res.status(404).json({ error: "Appointments not found" });
+            return res.status(200).json({ appointmentDetails: [] });
         }
 
         const formattedAppointments = data.map((appointment) => ({
@@ -285,12 +287,12 @@ router.get("/getappointments", checkValid, async (req, res) => {
             patientname: appointment.patients?.patientname || "Unknown",
             doctorid: appointment.doctorid,
             doctorname: appointment.doctors?.doctorname || "Unknown",
-            departmentname: appointment.departments?.departmentname || "Unknown",
+            departmentname: appointment.doctors?.departments?.departmentname || "Unknown",
             date: appointment.date,
             time: appointment.time,
             type: appointment.type,
             status: appointment.status,
-        }));
+        }));        
 
         return res.status(200).json({ appointmentDetails: formattedAppointments });
     } catch (err) {
